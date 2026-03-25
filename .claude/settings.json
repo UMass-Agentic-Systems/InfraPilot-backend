@@ -1,0 +1,16 @@
+{
+"$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": { 
+  "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/run-with-flags.js\" \"post:bash:pr-created\" \"scripts/hooks/post-bash-pr-created.js\" \"standard,strict\""
+          }
+        ]
+      }
+    ]
+   }
+}
