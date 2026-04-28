@@ -1,7 +1,8 @@
 import logging
 import threading
+from collections.abc import Callable
 from datetime import datetime, timezone
-from typing import TypedDict
+from typing import Any, TypedDict
 
 import yaml
 from kubernetes import client, config
@@ -16,6 +17,7 @@ logger = logging.getLogger(__name__)
 # Return-shape contracts consumed by the visualization endpoint (#17)
 # ---------------------------------------------------------------------------
 
+
 class ContainerInfo(TypedDict):
     name: str
     image: str
@@ -25,21 +27,28 @@ class TierInfo(TypedDict):
     name: str
     kind: str  # "Deployment" | "StatefulSet"
     containers: list[ContainerInfo]
-    pods: dict  # {"running": int, "pending": int, "failed": int, "total": int}
-    resources: dict  # {"cpu_usage_percent", "memory_usage_percent", "cpu_requests", "memory_requests"}
-    service: dict | None
-    hpa: dict | None
-    storage: dict | None
+    pods: dict[
+        str, int
+    ]  # {"running": int, "pending": int, "failed": int, "total": int}
+    resources: dict[
+        str, object
+    ]  # {"cpu_usage_percent", "memory_usage_percent", "cpu_requests", "memory_requests"}
+    service: dict[str, object] | None
+    hpa: dict[str, object] | None
+    storage: dict[str, object] | None
 
 
 class NamespaceStatus(TypedDict):
-    cluster: dict  # {"name", "provider", "region", "k8s_version", "nodes": {"ready", "total"}}
+    cluster: dict[
+        str, object
+    ]  # {"name", "provider", "region", "k8s_version", "nodes": {"ready", "total"}}
     tiers: list[TierInfo]
 
 
 # ---------------------------------------------------------------------------
 # Singleton
 # ---------------------------------------------------------------------------
+
 
 class KubernetesService:
     _instance: "KubernetesService | None" = None
@@ -77,7 +86,7 @@ class KubernetesService:
     # Manifest application
     # ------------------------------------------------------------------
 
-    def apply_manifest(self, namespace: str, yaml_str: str) -> list[dict]:
+    def apply_manifest(self, namespace: str, yaml_str: str) -> list[dict[str, Any]]:
         if not yaml_str or not yaml_str.strip():
             raise ValueError("yaml_str must not be empty")
         docs = list(yaml.safe_load_all(yaml_str))
@@ -90,38 +99,59 @@ class KubernetesService:
             results.append(self._apply_single(namespace, doc))
         return results
 
-    def _apply_single(self, namespace: str, manifest: dict) -> dict:
+    def _apply_single(self, namespace: str, manifest: dict[str, Any]) -> dict[str, str]:
         kind = manifest.get("kind", "")
         name = manifest.get("metadata", {}).get("name", "")
 
         if kind == "Deployment":
             return self._upsert(
                 name,
-                replace_fn=lambda: self._apps.replace_namespaced_deployment(name, namespace, manifest),
-                create_fn=lambda: self._apps.create_namespaced_deployment(namespace, manifest),
+                replace_fn=lambda: self._apps.replace_namespaced_deployment(
+                    name, namespace, manifest
+                ),
+                create_fn=lambda: self._apps.create_namespaced_deployment(
+                    namespace, manifest
+                ),
             )
         elif kind == "Service":
             return self._upsert(
                 name,
-                replace_fn=lambda: self._core.replace_namespaced_service(name, namespace, manifest),
-                create_fn=lambda: self._core.create_namespaced_service(namespace, manifest),
+                replace_fn=lambda: self._core.replace_namespaced_service(
+                    name, namespace, manifest
+                ),
+                create_fn=lambda: self._core.create_namespaced_service(
+                    namespace, manifest
+                ),
             )
         elif kind == "ConfigMap":
             return self._upsert(
                 name,
-                replace_fn=lambda: self._core.replace_namespaced_config_map(name, namespace, manifest),
-                create_fn=lambda: self._core.create_namespaced_config_map(namespace, manifest),
+                replace_fn=lambda: self._core.replace_namespaced_config_map(
+                    name, namespace, manifest
+                ),
+                create_fn=lambda: self._core.create_namespaced_config_map(
+                    namespace, manifest
+                ),
             )
         elif kind == "Secret":
             return self._upsert(
                 name,
-                replace_fn=lambda: self._core.replace_namespaced_secret(name, namespace, manifest),
-                create_fn=lambda: self._core.create_namespaced_secret(namespace, manifest),
+                replace_fn=lambda: self._core.replace_namespaced_secret(
+                    name, namespace, manifest
+                ),
+                create_fn=lambda: self._core.create_namespaced_secret(
+                    namespace, manifest
+                ),
             )
         else:
             raise ApiException(status=400, reason=f"Unsupported resource kind: {kind}")
 
-    def _upsert(self, name: str, replace_fn, create_fn) -> dict:
+    def _upsert(
+        self,
+        name: str,
+        replace_fn: Callable[[], object],
+        create_fn: Callable[[], object],
+    ) -> dict[str, str]:
         try:
             replace_fn()
             return {"name": name, "action": "replaced"}
@@ -135,7 +165,7 @@ class KubernetesService:
     # Event / log helpers
     # ------------------------------------------------------------------
 
-    def get_warning_events(self, namespace: str) -> list[dict]:
+    def get_warning_events(self, namespace: str) -> list[dict[str, object]]:
         try:
             resp = self._core.list_namespaced_event(namespace)
         except ApiException as e:
@@ -146,22 +176,30 @@ class KubernetesService:
             if ev.type != "Warning":
                 continue
             involved = ev.involved_object
-            events.append({
-                "reason": ev.reason,
-                "message": ev.message,
-                "involved_object": {
-                    "kind": involved.kind,
-                    "name": involved.name,
-                    "namespace": involved.namespace,
-                },
-                "count": ev.count,
-                "last_timestamp": ev.last_timestamp.isoformat() if ev.last_timestamp else None,
-            })
+            events.append(
+                {
+                    "reason": ev.reason,
+                    "message": ev.message,
+                    "involved_object": {
+                        "kind": involved.kind,
+                        "name": involved.name,
+                        "namespace": involved.namespace,
+                    },
+                    "count": ev.count,
+                    "last_timestamp": (
+                        ev.last_timestamp.isoformat() if ev.last_timestamp else None
+                    ),
+                }
+            )
         return events
 
     def get_pod_logs(self, namespace: str, pod_name: str, tail_lines: int = 200) -> str:
         try:
-            return self._core.read_namespaced_pod_log(pod_name, namespace, tail_lines=tail_lines)
+            return str(
+                self._core.read_namespaced_pod_log(
+                    pod_name, namespace, tail_lines=tail_lines
+                )
+            )
         except ApiException as e:
             return f"Error fetching logs for {pod_name}: {e}"
 
@@ -193,9 +231,7 @@ class KubernetesService:
             "spec": {
                 "template": {
                     "metadata": {
-                        "annotations": {
-                            "kubectl.kubernetes.io/restartedAt": now
-                        }
+                        "annotations": {"kubectl.kubernetes.io/restartedAt": now}
                     }
                 }
             }
@@ -222,7 +258,8 @@ class KubernetesService:
             nodes_resp = self._core.list_node()
             total_nodes = len(nodes_resp.items)
             ready_nodes = sum(
-                1 for n in nodes_resp.items
+                1
+                for n in nodes_resp.items
                 if any(
                     c.type == "Ready" and c.status == "True"
                     for c in (n.status.conditions or [])
@@ -232,7 +269,7 @@ class KubernetesService:
             total_nodes = 0
             ready_nodes = 0
 
-        cluster: dict = {
+        cluster: dict[str, object] = {
             "name": "default",
             "provider": "unknown",
             "region": "unknown",
@@ -262,7 +299,9 @@ class KubernetesService:
             services_resp = None
 
         try:
-            hpas_resp = self._autoscaling.list_namespaced_horizontal_pod_autoscaler(namespace)
+            hpas_resp = self._autoscaling.list_namespaced_horizontal_pod_autoscaler(
+                namespace
+            )
         except ApiException:
             hpas_resp = None
 
@@ -272,7 +311,7 @@ class KubernetesService:
             pvcs_resp = None
 
         # Build pod counts keyed by app label
-        pod_counts: dict[str, dict] = {}
+        pod_counts: dict[str, dict[str, int]] = {}
         if pods_resp:
             for pod in pods_resp.items:
                 key = (pod.metadata.labels or {}).get("app", pod.metadata.name)
@@ -289,7 +328,7 @@ class KubernetesService:
                     entry["failed"] += 1
 
         # Service lookup keyed by app selector
-        svc_map: dict[str, dict] = {}
+        svc_map: dict[str, dict[str, object]] = {}
         if services_resp:
             for svc in services_resp.items:
                 key = (svc.spec.selector or {}).get("app", svc.metadata.name)
@@ -297,7 +336,7 @@ class KubernetesService:
                 svc_map[key] = {"type": svc.spec.type, "port": port}
 
         # HPA lookup keyed by target deployment name
-        hpa_map: dict[str, dict] = {}
+        hpa_map: dict[str, dict[str, object]] = {}
         if hpas_resp:
             for hpa in hpas_resp.items:
                 target = hpa.spec.scale_target_ref.name
@@ -308,7 +347,7 @@ class KubernetesService:
                 }
 
         # PVC lookup keyed by app label
-        pvc_map: dict[str, dict] = {}
+        pvc_map: dict[str, dict[str, object]] = {}
         if pvcs_resp:
             for pvc in pvcs_resp.items:
                 key = (pvc.metadata.labels or {}).get("app", pvc.metadata.name)
@@ -328,30 +367,34 @@ class KubernetesService:
             workloads += [("StatefulSet", s) for s in statefulsets_resp.items]
 
         for kind, wl in workloads:
-            wl_name: str = wl.metadata.name  # type: ignore[union-attr]
+            wl_name: str = wl.metadata.name  # type: ignore[attr-defined]
             containers: list[ContainerInfo] = [
                 {"name": c.name, "image": c.image}
-                for c in (wl.spec.template.spec.containers or [])  # type: ignore[union-attr]
+                for c in (wl.spec.template.spec.containers or [])  # type: ignore[attr-defined]
             ]
-            resources: dict = {
+            resources: dict[str, object] = {
                 "cpu_usage_percent": None,
                 "memory_usage_percent": None,
                 "cpu_requests": None,
                 "memory_requests": None,
             }
-            spec_containers = wl.spec.template.spec.containers  # type: ignore[union-attr]
+            spec_containers = wl.spec.template.spec.containers  # type: ignore[attr-defined]
             if spec_containers:
                 first = spec_containers[0]
                 if first.resources and first.resources.requests:
                     resources["cpu_requests"] = first.resources.requests.get("cpu")
-                    resources["memory_requests"] = first.resources.requests.get("memory")
+                    resources["memory_requests"] = first.resources.requests.get(
+                        "memory"
+                    )
 
-            app_key = (wl.metadata.labels or {}).get("app", wl_name)  # type: ignore[union-attr]
+            app_key = (wl.metadata.labels or {}).get("app", wl_name)  # type: ignore[attr-defined]
             tier: TierInfo = {
                 "name": wl_name,
                 "kind": kind,
                 "containers": containers,
-                "pods": pod_counts.get(app_key, {"running": 0, "pending": 0, "failed": 0, "total": 0}),
+                "pods": pod_counts.get(
+                    app_key, {"running": 0, "pending": 0, "failed": 0, "total": 0}
+                ),
                 "resources": resources,
                 "service": svc_map.get(app_key) or svc_map.get(wl_name),
                 "hpa": hpa_map.get(wl_name),
@@ -365,6 +408,7 @@ class KubernetesService:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _parse_gi(storage: str) -> float:
     """Parse a Kubernetes storage quantity (e.g. '10Gi', '512Mi') into GiB."""

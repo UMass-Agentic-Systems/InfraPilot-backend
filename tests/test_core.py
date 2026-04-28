@@ -1,7 +1,7 @@
 from datetime import timedelta
 
 import pytest
-from jose import ExpiredSignatureError, jwt
+from jose import ExpiredSignatureError
 
 from app.core.config import settings
 from app.core.security import (
@@ -13,7 +13,10 @@ from app.core.security import (
 
 
 def test_settings_defaults():
-    assert settings.DATABASE_URL == "postgresql://postgres:postgres@localhost:5432/infrapilot"
+    assert (
+        settings.DATABASE_URL
+        == "postgresql://postgres:postgres@localhost:5432/infrapilot"
+    )
     assert settings.ALGORITHM == "HS256"
     assert settings.ACCESS_TOKEN_EXPIRE_MINUTES == 60
 
@@ -25,7 +28,10 @@ def test_secret_key_not_in_repr():
 
 def test_google_api_key_not_in_repr():
     r = repr(settings)
-    assert settings.GOOGLE_API_KEY.get_secret_value() not in r or settings.GOOGLE_API_KEY.get_secret_value() == ""
+    assert (
+        settings.GOOGLE_API_KEY.get_secret_value() not in r
+        or settings.GOOGLE_API_KEY.get_secret_value() == ""
+    )
 
 
 def test_hash_and_verify():
