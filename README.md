@@ -33,6 +33,8 @@ Multi-tenant namespace isolation ensures that each user's resources are securely
 - **Intelligent SRE Monitoring with Human-in-the-Loop Approval** — Continuous cluster health monitoring using AI to analyze warning events, generate remediation plans, and require explicit human approval before applying any fix.
 - **Auditable Remediation Trail** — Every SRE-proposed action is persisted with a rationale, approval status, and execution record for full traceability.
 - **Deployment State Management** — Persistent tracking of desired-state YAML, deployment status, and history in PostgreSQL.
+- **WebSocket Chat Interface** — Primary interaction surface for all deployment and SRE operations; persistent chat sessions with full history backed by PostgreSQL.
+- **Infrastructure Visualization** — Live cluster state per deployment: pod counts, resource requests, services, HPAs, PVCs, and remediation history.
 
 ## API Endpoints
 
@@ -63,6 +65,22 @@ Multi-tenant namespace isolation ensures that each user's resources are securely
 | POST | `/api/v1/monitor/scan` | Trigger an SRE health scan for a deployment |
 | GET | `/api/v1/monitor/plans` | List all remediation plans for the authenticated user |
 | POST | `/api/v1/monitor/plans/{plan_id}/approve` | Approve or reject a pending remediation plan |
+
+### Chat
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/v1/chat/sessions` | Create a new chat session |
+| GET | `/api/v1/chat/sessions` | List all chat sessions for the authenticated user |
+| GET | `/api/v1/chat/sessions/{session_id}` | Get a session with full message history |
+| WS | `/api/v1/chat/sessions/{session_id}/ws?token={jwt}` | WebSocket — primary interface for deploy and SRE operations |
+| DELETE | `/api/v1/chat/sessions/{session_id}` | Delete a session and all its messages |
+
+### Visualization
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/visualize/{deployment_id}` | Live cluster state: pods, services, HPAs, PVCs, and remediation history |
 
 ## Non-Functional Requirements
 
@@ -144,19 +162,15 @@ Open `.env` and set these values:
 | `KUBECONFIG_PATH` | No | Defaults to `~/.kube/config` |
 | `SRE_SCAN_INTERVAL_SECONDS` | No | Defaults to `120` |
 
-### 6. Run database migrations
-
-```bash
-alembic upgrade head
-```
-
-### 7. Start Minikube (optional — required for K8s features)
+### 6. Start Minikube (optional — required for K8s features)
 
 ```bash
 minikube start
 ```
 
-### 8. Start the development server
+### 7. Start the development server
+
+> **Note:** Database tables are created automatically on server startup (`create_all`). No migration step is needed in development.
 
 ```bash
 uvicorn app.main:app --reload
@@ -171,7 +185,7 @@ curl http://localhost:8000/health
 # {"status":"ok"}
 ```
 
-### 9. Run tests
+### 8. Run tests
 
 ```bash
 pytest
