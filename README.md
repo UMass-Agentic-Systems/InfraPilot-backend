@@ -81,3 +81,73 @@ Differences between Minikube, managed clusters (GKE/EKS), and bare-metal setups 
 The project depends on rapidly evolving libraries (LangGraph, LangChain, Kubernetes Python client) and must ship within an academic semester.
 
 **Mitigations:** Pinned dependency versions in `pyproject.toml`; prioritized core workflow (register → deploy → scan → approve); sprint-based schedule with bi-weekly milestones.
+
+## Quickstart
+
+### Prerequisites
+
+- Python 3.11+
+- PostgreSQL (running locally or via Docker)
+- [Minikube](https://minikube.sigs.k8s.io/docs/start/) (for local Kubernetes)
+- A Google Gemini API key
+
+### 1. Clone and enter the repo
+
+```bash
+git clone https://github.com/UMass-Agentic-Systems/InfraPilot-backend.git
+cd InfraPilot-backend
+```
+
+### 2. Create and activate a virtual environment
+
+```bash
+python -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+```
+
+### 3. Install dependencies
+
+```bash
+pip install -e ".[dev]"
+```
+
+### 4. Configure environment variables
+
+```bash
+cp .env.example .env
+# Edit .env and fill in SECRET_KEY, GOOGLE_API_KEY, and DATABASE_URL
+```
+
+### 5. Start PostgreSQL and create the database
+
+```bash
+# If using Docker:
+docker run -d --name infrapilot-db -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres:16
+docker exec -it infrapilot-db psql -U postgres -c "CREATE DATABASE infrapilot;"
+```
+
+### 6. Start Minikube (optional — required for K8s features)
+
+```bash
+minikube start
+```
+
+### 7. Run database migrations
+
+```bash
+alembic upgrade head
+```
+
+### 8. Start the development server
+
+```bash
+uvicorn app.main:app --reload
+```
+
+The API will be available at `http://localhost:8000`. Interactive docs at `http://localhost:8000/docs`.
+
+### 9. Run tests
+
+```bash
+pytest
+```
