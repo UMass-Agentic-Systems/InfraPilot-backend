@@ -87,9 +87,9 @@ The project depends on rapidly evolving libraries (LangGraph, LangChain, Kuberne
 ### Prerequisites
 
 - Python 3.11+
-- PostgreSQL (running locally or via Docker)
-- [Minikube](https://minikube.sigs.k8s.io/docs/start/) (for local Kubernetes)
-- A Google Gemini API key
+- [Docker](https://docs.docker.com/get-docker/) (for running PostgreSQL)
+- [Minikube](https://minikube.sigs.k8s.io/docs/start/) (for local Kubernetes features)
+- A [Google Gemini API key](https://aistudio.google.com/app/apikey) — **required**
 
 ### 1. Clone and enter the repo
 
@@ -111,31 +111,37 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 ```
 
-### 4. Configure environment variables
+### 4. Start PostgreSQL and create the database
+
+Make sure Docker Desktop is running, then:
+
+```bash
+docker run -d --name infrapilot-db -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres:16
+docker exec -i infrapilot-db psql -U postgres -c "CREATE DATABASE infrapilot;"
+```
+
+### 5. Configure environment variables
 
 ```bash
 cp .env.example .env
-# Edit .env and fill in SECRET_KEY, GOOGLE_API_KEY, and DATABASE_URL
 ```
 
-### 5. Start PostgreSQL and create the database
+Open `.env` and set the following required values:
 
-```bash
-# If using Docker:
-docker run -d --name infrapilot-db -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres:16
-docker exec -it infrapilot-db psql -U postgres -c "CREATE DATABASE infrapilot;"
-```
+- `SECRET_KEY` — generate one with `python -c "import secrets; print(secrets.token_hex(32))"`
+- `GOOGLE_API_KEY` — your Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey)
+- `DATABASE_URL` — defaults to `postgresql://postgres:postgres@localhost:5432/infrapilot` (matches the Docker command above)
 
-### 6. Start Minikube (optional — required for K8s features)
-
-```bash
-minikube start
-```
-
-### 7. Run database migrations
+### 6. Run database migrations
 
 ```bash
 alembic upgrade head
+```
+
+### 7. Start Minikube (optional — required for K8s features)
+
+```bash
+minikube start
 ```
 
 ### 8. Start the development server
