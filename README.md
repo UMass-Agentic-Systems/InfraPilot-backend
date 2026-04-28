@@ -36,6 +36,12 @@ Multi-tenant namespace isolation ensures that each user's resources are securely
 
 ## API Endpoints
 
+### Health
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/health` | Liveness check — returns `{"status": "ok"}` |
+
 ### Authentication
 
 | Method | Endpoint | Description |
@@ -126,11 +132,17 @@ docker exec -i infrapilot-db psql -U postgres -c "CREATE DATABASE infrapilot;"
 cp .env.example .env
 ```
 
-Open `.env` and set the following required values:
+Open `.env` and set these values:
 
-- `SECRET_KEY` — generate one with `python -c "import secrets; print(secrets.token_hex(32))"`
-- `GOOGLE_API_KEY` — your Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey)
-- `DATABASE_URL` — defaults to `postgresql://postgres:postgres@localhost:5432/infrapilot` (matches the Docker command above)
+| Variable | Required | Notes |
+|----------|----------|-------|
+| `SECRET_KEY` | **Yes** | Generate with `python -c "import secrets; print(secrets.token_hex(32))"` |
+| `GOOGLE_API_KEY` | **Yes** | From [Google AI Studio](https://aistudio.google.com/app/apikey) |
+| `DATABASE_URL` | No | Defaults to `postgresql://postgres:postgres@localhost:5432/infrapilot` — matches the Docker command above |
+| `ALGORITHM` | No | Defaults to `HS256` |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | No | Defaults to `60` |
+| `KUBECONFIG_PATH` | No | Defaults to `~/.kube/config` |
+| `SRE_SCAN_INTERVAL_SECONDS` | No | Defaults to `120` |
 
 ### 6. Run database migrations
 
@@ -151,6 +163,13 @@ uvicorn app.main:app --reload
 ```
 
 The API will be available at `http://localhost:8000`. Interactive docs at `http://localhost:8000/docs`.
+
+Verify the server is running:
+
+```bash
+curl http://localhost:8000/health
+# {"status":"ok"}
+```
 
 ### 9. Run tests
 
