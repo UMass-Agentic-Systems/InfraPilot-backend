@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from typing import Any, cast
 
 import bcrypt
 from jose import jwt
@@ -24,8 +25,22 @@ def create_access_token(subject: str, expires_delta: timedelta | None = None) ->
     delta = expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     expire = datetime.now(timezone.utc) + delta
     payload = {"sub": subject, "exp": expire}
-    return jwt.encode(payload, settings.SECRET_KEY.get_secret_value(), algorithm=settings.ALGORITHM)
+    return cast(
+        str,
+        jwt.encode(
+            payload,
+            settings.SECRET_KEY.get_secret_value(),
+            algorithm=settings.ALGORITHM,
+        ),
+    )
 
 
-def decode_access_token(token: str) -> dict:
-    return jwt.decode(token, settings.SECRET_KEY.get_secret_value(), algorithms=[settings.ALGORITHM])
+def decode_access_token(token: str) -> dict[str, Any]:
+    return cast(
+        dict[str, Any],
+        jwt.decode(
+            token,
+            settings.SECRET_KEY.get_secret_value(),
+            algorithms=[settings.ALGORITHM],
+        ),
+    )

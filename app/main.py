@@ -1,5 +1,5 @@
-import asyncio
 import logging
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("InfraPilot backend starting up")
 
     Base.metadata.create_all(bind=engine)
@@ -41,5 +41,5 @@ app = FastAPI(title="InfraPilot", version="0.1.0", lifespan=lifespan)
 
 
 @app.get("/health")
-def health() -> dict:
+def health() -> dict[str, str]:
     return {"status": "ok"}
