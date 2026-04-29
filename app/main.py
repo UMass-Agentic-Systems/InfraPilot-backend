@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import auth
+from app.api.v1 import auth, deploy
 from app.core.logging_config import configure_logging
 from app.db.base import Base
 from app.db.session import engine
@@ -45,10 +45,10 @@ app.add_middleware(
 )
 
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
+app.include_router(deploy.router, prefix="/api/v1/deploy", tags=["deploy"])
 
 # TODO(#18): wire remaining routers once they exist
-# from app.api.v1 import deploy, monitor, chat, visualize
-# app.include_router(deploy.router,     prefix="/api/v1/deploy",     tags=["deploy"])
+# from app.api.v1 import monitor, chat, visualize
 # app.include_router(monitor.router,    prefix="/api/v1/monitor",    tags=["monitor"])
 # app.include_router(chat.router,       prefix="/api/v1/chat",       tags=["chat"])
 # app.include_router(visualize.router,  prefix="/api/v1/visualize",  tags=["visualize"])
