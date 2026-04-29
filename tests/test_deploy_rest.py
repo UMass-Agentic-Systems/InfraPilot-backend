@@ -16,13 +16,22 @@ from app.db.models import Deployment, User
 
 
 def test_deploy_post_failure_returns_200_with_status_failed(
-    client: TestClient, auth_headers: dict[str, str]
+    client: TestClient,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A1 fix: agent raise -> HTTP 200 with status='failed', not an HTTP error.
+    """A1 fix: agent failure -> HTTP 200 with status='failed', not an HTTP error.
 
-    The provisioning agent stub always raises NotImplementedError, so this
-    test exercises the failure path against the real handler.
+    The LLM tool is patched to raise so the failure is deterministic and no
+    real Gemini call is attempted; the gen_manifests node catches it and
+    short-circuits to status='failed' before any DB row is created.
     """
+
+    async def boom(_requirements: str) -> str:
+        raise RuntimeError("simulated LLM outage")
+
+    monkeypatch.setattr("app.agents.provisioning.tools.generate_manifests", boom)
+
     resp = client.post(
         "/api/v1/deploy/",
         json={"app_name": "myapp", "requirements": "react frontend"},
