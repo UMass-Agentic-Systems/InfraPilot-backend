@@ -57,9 +57,7 @@ def upgrade() -> None:
         sa.Column("metadata_json", sa.Text(), nullable=True),
         sa.Column("position", sa.Integer(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.ForeignKeyConstraint(
-            ["session_id"], ["chat_sessions.id"], ondelete="CASCADE"
-        ),
+        sa.ForeignKeyConstraint(["session_id"], ["chat_sessions.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_chat_messages_id"), "chat_messages", ["id"], unique=False)
@@ -73,9 +71,7 @@ def upgrade() -> None:
         sa.Column("status", sa.String(length=32), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
-        sa.ForeignKeyConstraint(
-            ["chat_session_id"], ["chat_sessions.id"], ondelete="SET NULL"
-        ),
+        sa.ForeignKeyConstraint(["chat_session_id"], ["chat_sessions.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -92,17 +88,11 @@ def upgrade() -> None:
         sa.Column("applied", sa.Boolean(), nullable=False),
         sa.Column("source", sa.String(length=16), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.CheckConstraint(
-            "NOT applied OR approved", name="ck_applied_implies_approved"
-        ),
-        sa.ForeignKeyConstraint(
-            ["deployment_id"], ["deployments.id"], ondelete="CASCADE"
-        ),
+        sa.CheckConstraint("NOT applied OR approved", name="ck_applied_implies_approved"),
+        sa.ForeignKeyConstraint(["deployment_id"], ["deployments.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(
-        op.f("ix_remediation_plans_id"), "remediation_plans", ["id"], unique=False
-    )
+    op.create_index(op.f("ix_remediation_plans_id"), "remediation_plans", ["id"], unique=False)
     # ### end Alembic commands ###
 
 

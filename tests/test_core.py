@@ -13,10 +13,7 @@ from app.core.security import (
 
 
 def test_settings_defaults():
-    assert (
-        settings.DATABASE_URL
-        == "postgresql://postgres:postgres@localhost:5432/infrapilot"
-    )
+    assert settings.DATABASE_URL == "postgresql://postgres:postgres@localhost:5432/infrapilot"
     assert settings.ALGORITHM == "HS256"
     assert settings.ACCESS_TOKEN_EXPIRE_MINUTES == 60
 
