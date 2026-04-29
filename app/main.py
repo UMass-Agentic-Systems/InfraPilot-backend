@@ -3,10 +3,14 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1 import auth
+from app.core.logging_config import configure_logging
 from app.db.base import Base
 from app.db.session import engine
+
+configure_logging()
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +35,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="InfraPilot", version="0.1.0", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 

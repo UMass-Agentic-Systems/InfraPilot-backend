@@ -20,9 +20,7 @@ class ConnectionManager:
         self.active_connections: dict[int, dict[int, WebSocket]] = {}
         self._lock = asyncio.Lock()
 
-    async def connect(
-        self, user_id: int, session_id: int, websocket: WebSocket
-    ) -> None:
+    async def connect(self, user_id: int, session_id: int, websocket: WebSocket) -> None:
         await websocket.accept()
         old: WebSocket | None = None
         async with self._lock:
@@ -51,9 +49,7 @@ class ConnectionManager:
             if not user_sessions:
                 self.active_connections.pop(user_id, None)
 
-    async def send_to_session(
-        self, user_id: int, session_id: int, data: dict[str, Any]
-    ) -> None:
+    async def send_to_session(self, user_id: int, session_id: int, data: dict[str, Any]) -> None:
         async with self._lock:
             ws = self.active_connections.get(user_id, {}).get(session_id)
         if ws is None:

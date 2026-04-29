@@ -27,9 +27,7 @@ class TierInfo(TypedDict):
     name: str
     kind: str  # "Deployment" | "StatefulSet"
     containers: list[ContainerInfo]
-    pods: dict[
-        str, int
-    ]  # {"running": int, "pending": int, "failed": int, "total": int}
+    pods: dict[str, int]  # {"running": int, "pending": int, "failed": int, "total": int}
     resources: dict[
         str, object
     ]  # {"cpu_usage_percent", "memory_usage_percent", "cpu_requests", "memory_requests"}
@@ -109,19 +107,13 @@ class KubernetesService:
                 replace_fn=lambda: self._apps.replace_namespaced_deployment(
                     name, namespace, manifest
                 ),
-                create_fn=lambda: self._apps.create_namespaced_deployment(
-                    namespace, manifest
-                ),
+                create_fn=lambda: self._apps.create_namespaced_deployment(namespace, manifest),
             )
         elif kind == "Service":
             return self._upsert(
                 name,
-                replace_fn=lambda: self._core.replace_namespaced_service(
-                    name, namespace, manifest
-                ),
-                create_fn=lambda: self._core.create_namespaced_service(
-                    namespace, manifest
-                ),
+                replace_fn=lambda: self._core.replace_namespaced_service(name, namespace, manifest),
+                create_fn=lambda: self._core.create_namespaced_service(namespace, manifest),
             )
         elif kind == "ConfigMap":
             return self._upsert(
@@ -129,19 +121,13 @@ class KubernetesService:
                 replace_fn=lambda: self._core.replace_namespaced_config_map(
                     name, namespace, manifest
                 ),
-                create_fn=lambda: self._core.create_namespaced_config_map(
-                    namespace, manifest
-                ),
+                create_fn=lambda: self._core.create_namespaced_config_map(namespace, manifest),
             )
         elif kind == "Secret":
             return self._upsert(
                 name,
-                replace_fn=lambda: self._core.replace_namespaced_secret(
-                    name, namespace, manifest
-                ),
-                create_fn=lambda: self._core.create_namespaced_secret(
-                    namespace, manifest
-                ),
+                replace_fn=lambda: self._core.replace_namespaced_secret(name, namespace, manifest),
+                create_fn=lambda: self._core.create_namespaced_secret(namespace, manifest),
             )
         else:
             raise ApiException(status=400, reason=f"Unsupported resource kind: {kind}")
@@ -196,9 +182,7 @@ class KubernetesService:
     def get_pod_logs(self, namespace: str, pod_name: str, tail_lines: int = 200) -> str:
         try:
             return str(
-                self._core.read_namespaced_pod_log(
-                    pod_name, namespace, tail_lines=tail_lines
-                )
+                self._core.read_namespaced_pod_log(pod_name, namespace, tail_lines=tail_lines)
             )
         except ApiException as e:
             return f"Error fetching logs for {pod_name}: {e}"
@@ -230,9 +214,7 @@ class KubernetesService:
         patch = {
             "spec": {
                 "template": {
-                    "metadata": {
-                        "annotations": {"kubectl.kubernetes.io/restartedAt": now}
-                    }
+                    "metadata": {"annotations": {"kubectl.kubernetes.io/restartedAt": now}}
                 }
             }
         }
@@ -261,8 +243,7 @@ class KubernetesService:
                 1
                 for n in nodes_resp.items
                 if any(
-                    c.type == "Ready" and c.status == "True"
-                    for c in (n.status.conditions or [])
+                    c.type == "Ready" and c.status == "True" for c in (n.status.conditions or [])
                 )
             )
         except ApiException:
@@ -299,9 +280,7 @@ class KubernetesService:
             services_resp = None
 
         try:
-            hpas_resp = self._autoscaling.list_namespaced_horizontal_pod_autoscaler(
-                namespace
-            )
+            hpas_resp = self._autoscaling.list_namespaced_horizontal_pod_autoscaler(namespace)
         except ApiException:
             hpas_resp = None
 
@@ -383,9 +362,7 @@ class KubernetesService:
                 first = spec_containers[0]
                 if first.resources and first.resources.requests:
                     resources["cpu_requests"] = first.resources.requests.get("cpu")
-                    resources["memory_requests"] = first.resources.requests.get(
-                        "memory"
-                    )
+                    resources["memory_requests"] = first.resources.requests.get("memory")
 
             app_key = (wl.metadata.labels or {}).get("app", wl_name)  # type: ignore[attr-defined]
             tier: TierInfo = {
