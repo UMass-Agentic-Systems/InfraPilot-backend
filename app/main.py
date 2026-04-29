@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.api.v1 import auth
 from app.db.base import Base
 from app.db.session import engine
 
@@ -31,9 +32,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="InfraPilot", version="0.1.0", lifespan=lifespan)
 
-# TODO(#18): wire all routers once they exist
-# from app.api.v1 import auth, deploy, monitor, chat, visualize
-# app.include_router(auth.router,       prefix="/api/v1/auth",      tags=["auth"])
+app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
+
+# TODO(#18): wire remaining routers once they exist
+# from app.api.v1 import deploy, monitor, chat, visualize
 # app.include_router(deploy.router,     prefix="/api/v1/deploy",     tags=["deploy"])
 # app.include_router(monitor.router,    prefix="/api/v1/monitor",    tags=["monitor"])
 # app.include_router(chat.router,       prefix="/api/v1/chat",       tags=["chat"])
