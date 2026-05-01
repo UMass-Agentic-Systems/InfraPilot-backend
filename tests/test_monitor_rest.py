@@ -209,9 +209,7 @@ def test_list_plans_returns_only_owned_ordered_desc(
     assert all(p["deployment_id"] == mine.id for p in body)
 
 
-def test_list_plans_empty_is_not_an_error(
-    client: TestClient, auth_headers: dict[str, str]
-) -> None:
+def test_list_plans_empty_is_not_an_error(client: TestClient, auth_headers: dict[str, str]) -> None:
     resp = client.get("/api/v1/monitor/plans", headers=auth_headers)
     assert resp.status_code == 200
     assert resp.json() == []
