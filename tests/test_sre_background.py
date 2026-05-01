@@ -369,9 +369,7 @@ async def test_scan_persists_chat_message_before_ws_send(
 
     async def capture_send(user_id: int, payload: dict[str, Any]) -> None:
         observed["row_count_at_send"] = (
-            db_session.query(ChatMessage)
-            .filter(ChatMessage.session_id == chat.id)
-            .count()
+            db_session.query(ChatMessage).filter(ChatMessage.session_id == chat.id).count()
         )
         observed["payload"] = payload
 
@@ -464,7 +462,11 @@ async def test_per_user_exception_does_not_affect_other_users(
     def get_warning_events(namespace: str) -> list[dict[str, Any]]:
         if namespace == "user-bad":
             raise RuntimeError("k8s blew up for this user")
-        return [dict(_POD_EVENT, involved_object={"kind": "Pod", "name": "web-1", "namespace": namespace})]
+        return [
+            dict(
+                _POD_EVENT, involved_object={"kind": "Pod", "name": "web-1", "namespace": namespace}
+            )
+        ]
 
     k8s = MagicMock()
     k8s.get_warning_events = MagicMock(side_effect=get_warning_events)
