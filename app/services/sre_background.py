@@ -85,9 +85,7 @@ async def _scan_all_users(
             try:
                 await _scan_user(user=user, db=db, k8s=k8s, ws_manager=ws_manager)
             except Exception as exc:
-                logger.warning(
-                    "Background scan for user %s failed: %s", user.id, exc
-                )
+                logger.warning("Background scan for user %s failed: %s", user.id, exc)
                 db.rollback()
     finally:
         db.close()
@@ -103,9 +101,7 @@ async def _scan_user(
     try:
         events = k8s.get_warning_events(user.namespace)
     except Exception as exc:
-        logger.warning(
-            "get_warning_events failed for namespace %s: %s", user.namespace, exc
-        )
+        logger.warning("get_warning_events failed for namespace %s: %s", user.namespace, exc)
         return
 
     if not events:
@@ -131,9 +127,7 @@ async def _scan_user(
 
         if is_recent_unresolved_plan(latest_unresolved, now, interval):
             continue
-        if latest_unresolved is not None and events_match(
-            events, latest_unresolved.event_summary
-        ):
+        if latest_unresolved is not None and events_match(events, latest_unresolved.event_summary):
             continue
 
         result = await run_sre_agent(
@@ -144,10 +138,7 @@ async def _scan_user(
             db=db,
         )
 
-        if (
-            result.get("status") != "awaiting_approval"
-            or result.get("plan_db_id") is None
-        ):
+        if result.get("status") != "awaiting_approval" or result.get("plan_db_id") is None:
             continue
 
         await _maybe_alert_user(
@@ -189,9 +180,7 @@ async def _maybe_alert_user(
         }
     )
 
-    position = (
-        db.query(ChatMessage).filter(ChatMessage.session_id == session_id).count()
-    )
+    position = db.query(ChatMessage).filter(ChatMessage.session_id == session_id).count()
     chat_msg = ChatMessage(
         session_id=session_id,
         role="sre-agent",
@@ -216,9 +205,7 @@ async def _maybe_alert_user(
                 "content": chat_msg.content,
                 "metadata_json": chat_msg.metadata_json,
                 "position": chat_msg.position,
-                "created_at": chat_msg.created_at.isoformat()
-                if chat_msg.created_at
-                else None,
+                "created_at": chat_msg.created_at.isoformat() if chat_msg.created_at else None,
             },
         },
     )
