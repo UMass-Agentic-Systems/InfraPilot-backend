@@ -65,9 +65,7 @@ def _seed_other_user(db_session: Session) -> User:
 # ---------------------------------------------------------------------------
 
 
-def test_create_session_default_title(
-    client: TestClient, auth_headers: dict[str, str]
-) -> None:
+def test_create_session_default_title(client: TestClient, auth_headers: dict[str, str]) -> None:
     resp = client.post("/api/v1/chat/sessions", json={}, headers=auth_headers)
     assert resp.status_code == 201, resp.text
     body = resp.json()
@@ -77,12 +75,8 @@ def test_create_session_default_title(
     assert "updated_at" in body
 
 
-def test_create_session_custom_title(
-    client: TestClient, auth_headers: dict[str, str]
-) -> None:
-    resp = client.post(
-        "/api/v1/chat/sessions", json={"title": "My Session"}, headers=auth_headers
-    )
+def test_create_session_custom_title(client: TestClient, auth_headers: dict[str, str]) -> None:
+    resp = client.post("/api/v1/chat/sessions", json={"title": "My Session"}, headers=auth_headers)
     assert resp.status_code == 201, resp.text
     assert resp.json()["title"] == "My Session"
 
@@ -195,9 +189,7 @@ def test_get_session_limits_to_200_messages(
     assert len(resp.json()["messages"]) == 200
 
 
-def test_get_session_unknown_returns_404(
-    client: TestClient, auth_headers: dict[str, str]
-) -> None:
+def test_get_session_unknown_returns_404(client: TestClient, auth_headers: dict[str, str]) -> None:
     resp = client.get("/api/v1/chat/sessions/99999", headers=auth_headers)
     assert resp.status_code == 404
 
