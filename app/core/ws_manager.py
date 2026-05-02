@@ -96,5 +96,24 @@ class ConnectionManager:
         async with self._lock:
             return bool(self.active_connections.get(user_id))
 
+    async def close_session(self, user_id: int, session_id: int, code: int) -> None:
+        """Close a session's WebSocket with the given close code and remove it."""
+        async with self._lock:
+            user_sessions = self.active_connections.get(user_id, {})
+            ws = user_sessions.pop(session_id, None)
+            if not user_sessions:
+                self.active_connections.pop(user_id, None)
+        if ws is not None:
+            try:
+                await ws.close(code=code)
+            except Exception as exc:
+                logger.debug(
+                    "close_session(user=%s, session=%s, code=%s) failed: %s",
+                    user_id,
+                    session_id,
+                    code,
+                    exc,
+                )
+
 
 manager = ConnectionManager()
