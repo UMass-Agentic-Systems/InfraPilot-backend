@@ -1,7 +1,7 @@
 """Visualization endpoint — live cluster state (spec §6.5, issue #18)."""
 
 import logging
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -113,7 +113,7 @@ def visualize(
         ns_status = k8s.get_namespace_status(user.namespace)
         return VisualizeResponse(
             cluster=_build_cluster(ns_status["cluster"]),
-            tiers=[_build_tier(t) for t in ns_status.get("tiers", [])],
+            tiers=[_build_tier(cast(dict[str, Any], t)) for t in ns_status.get("tiers", [])],
             **base,
         )
     except Exception as exc:
