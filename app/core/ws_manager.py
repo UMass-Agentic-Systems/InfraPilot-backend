@@ -115,5 +115,18 @@ class ConnectionManager:
                     exc,
                 )
 
+    async def close_all(self, code: int = 1001) -> None:
+        """Close every active WebSocket connection and clear the registry."""
+        async with self._lock:
+            all_sockets = [
+                ws for sessions in self.active_connections.values() for ws in sessions.values()
+            ]
+            self.active_connections.clear()
+        for ws in all_sockets:
+            try:
+                await ws.close(code=code)
+            except Exception as exc:
+                logger.debug("close_all close failed: %s", exc)
+
 
 manager = ConnectionManager()
