@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -5,10 +6,13 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import auth, chat, deploy, monitor
+from app.api.v1 import auth, chat, deploy, monitor, visualize
 from app.core.logging_config import configure_logging
+from app.core.ws_manager import manager
 from app.db.base import Base
 from app.db.session import engine
+from app.services.k8s_client import KubernetesService
+from app.services.sre_background import sre_background_loop
 
 configure_logging()
 
@@ -21,15 +25,24 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     Base.metadata.create_all(bind=engine)
 
-    # TODO(#18): instantiate KubernetesService.get_instance() (warn on failure, do not crash)
-    # TODO(#18): bg_task = asyncio.create_task(sre_background_loop())
+    try:
+        KubernetesService.get_instance()
+    except Exception as exc:
+        logger.warning("Kubernetes client unavailable at startup: %s", exc)
+
+    bg_task = asyncio.create_task(sre_background_loop())
 
     yield
 
     logger.info("InfraPilot backend shutting down")
 
-    # TODO(#18): cancel and await bg_task
-    # TODO(#18): close all WebSocket connections via manager
+    bg_task.cancel()
+    try:
+        await bg_task
+    except asyncio.CancelledError:
+        pass
+
+    await manager.close_all()
 
     engine.dispose()
 
@@ -48,10 +61,7 @@ app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(chat.router, prefix="/api/v1/chat", tags=["chat"])
 app.include_router(deploy.router, prefix="/api/v1/deploy", tags=["deploy"])
 app.include_router(monitor.router, prefix="/api/v1/monitor", tags=["monitor"])
-
-# TODO(#18): wire remaining routers once they exist
-# from app.api.v1 import visualize
-# app.include_router(visualize.router,  prefix="/api/v1/visualize",  tags=["visualize"])
+app.include_router(visualize.router, prefix="/api/v1/visualize", tags=["visualize"])
 
 
 @app.get("/health")
