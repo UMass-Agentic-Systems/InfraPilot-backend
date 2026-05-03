@@ -13,6 +13,7 @@ from app.agents.provisioning.graph import run_provisioning_agent
 from app.agents.sre.graph import run_sre_agent
 from app.api.deps import get_current_user, get_db
 from app.api.schemas.chat import (
+    AgentName,
     MessageOut,
     SessionCreate,
     SessionDetail,
@@ -34,7 +35,7 @@ _WS_SESSION_DELETED = 4010
 _WS_AUTH_FAILED = 4001
 _WS_FORBIDDEN = 4004
 
-_DEPLOY_KEYWORDS = ("provision", "deploy", "launch", "spin up", "install")
+_DEPLOY_RE = re.compile(r"\b(?:provision|deploy|launch|spin\s+up|install)\b", re.IGNORECASE)
 _SRE_KEYWORDS = ("scan", "monitor", "check", "fix", "remediate", "approve")
 
 
@@ -45,7 +46,7 @@ _SRE_KEYWORDS = ("scan", "monitor", "check", "fix", "remediate", "approve")
 
 def _detect_intent(content: str) -> str:
     text = content.lower()
-    if any(kw in text for kw in _DEPLOY_KEYWORDS):
+    if _DEPLOY_RE.search(text):
         return "deploy"
     if any(kw in text for kw in _SRE_KEYWORDS):
         return "sre"
@@ -255,7 +256,7 @@ async def chat_ws(
 
             content = client_msg.content
             intent = _detect_intent(content)
-            agent_name: str = "sre-agent" if intent == "sre" else "infra-agent"
+            agent_name: AgentName = "sre-agent" if intent == "sre" else "infra-agent"
 
             # Persist user message before agent invocation
             user_pos = _next_position(db, session_id)
