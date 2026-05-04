@@ -4,6 +4,7 @@ import logging
 import re
 from datetime import datetime, timezone
 
+import yaml
 from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect, status
 from jose import JWTError
 from sqlalchemy import func
@@ -12,8 +13,10 @@ from sqlalchemy.orm import Session
 from app.agents.provisioning.graph import run_provisioning_agent
 from app.agents.sre.graph import run_sre_agent
 from app.api.deps import get_current_user, get_db
+from app.services.k8s_client import KubernetesService
 from app.api.schemas.chat import (
     AgentName,
+    DeploymentSummary,
     MessageOut,
     SessionCreate,
     SessionDetail,
@@ -36,6 +39,9 @@ _WS_AUTH_FAILED = 4001
 _WS_FORBIDDEN = 4004
 
 _DEPLOY_RE = re.compile(r"\b(?:provision|deploy|launch|spin\s+up|install)\b", re.IGNORECASE)
+_DELETE_RE = re.compile(
+    r"\b(?:delete|destroy|teardown|tear\s+down|uninstall|remove)\b", re.IGNORECASE
+)
 _SRE_KEYWORDS = ("scan", "monitor", "check", "fix", "remediate", "approve")
 
 
@@ -46,11 +52,50 @@ _SRE_KEYWORDS = ("scan", "monitor", "check", "fix", "remediate", "approve")
 
 def _detect_intent(content: str) -> str:
     text = content.lower()
+    # Check delete first — "remove" is in the delete set and would otherwise be
+    # ambiguous against future deploy variants. Delete keywords don't overlap
+    # with the deploy set today.
+    if _DELETE_RE.search(text):
+        return "delete"
     if _DEPLOY_RE.search(text):
         return "deploy"
     if any(kw in text for kw in _SRE_KEYWORDS):
         return "sre"
     return "general"
+
+
+def _delete_deployment(deployment: Deployment, namespace: str, db: Session) -> tuple[int, list[str]]:
+    """Tear down the deployment's K8s resources and drop the DB row.
+
+    Returns (deleted_count, errors). RemediationPlan rows CASCADE on delete.
+    K8s failures per resource are isolated — we report them but still remove
+    the DB row so the user isn't left with a phantom deployment.
+    """
+    deleted = 0
+    errors: list[str] = []
+    yaml_str = deployment.desired_state_yaml or ""
+    if yaml_str.strip():
+        try:
+            k8s = KubernetesService.get_instance()
+        except Exception as exc:  # K8s unreachable
+            errors.append(f"Kubernetes unavailable: {exc}")
+        else:
+            for doc in yaml.safe_load_all(yaml_str):
+                if not isinstance(doc, dict):
+                    continue
+                kind = doc.get("kind")
+                name = (doc.get("metadata") or {}).get("name")
+                if not kind or not name:
+                    continue
+                try:
+                    k8s.delete_resource(namespace, kind, name)
+                    deleted += 1
+                except Exception as exc:
+                    errors.append(f"{kind}/{name}: {exc}")
+
+    db.delete(deployment)
+    db.commit()
+    return deleted, errors
 
 
 def _extract_app_name(content: str) -> str:
@@ -101,6 +146,34 @@ async def _dispatch(
         return (
             f"Deployed successfully — app: {app_name}, "
             f"deployment ID: {result['deployment_id']}, status: {result['status']}"
+        )
+
+    if intent == "delete":
+        # Scope to deployments created in *this* session — same isolation rule
+        # the visualize endpoint enforces. Most-recent first so phrasing like
+        # "delete my app" targets what the user just deployed.
+        deployment = (
+            db.query(Deployment)
+            .filter(Deployment.user_id == user.id, Deployment.chat_session_id == session_id)
+            .order_by(Deployment.created_at.desc())
+            .first()
+        )
+        if deployment is None:
+            return "No deployments found in this session to delete."
+        app_name = deployment.app_name
+        deployment_id = deployment.id
+        try:
+            deleted, errors = _delete_deployment(deployment, user.namespace, db)
+        except Exception as exc:
+            return f"Deletion failed: {exc}"
+        if errors:
+            return (
+                f"Deleted deployment ID: {deployment_id}, app: {app_name}, status: deleted "
+                f"(removed {deleted} K8s resource(s); errors: {'; '.join(errors)})"
+            )
+        return (
+            f"Deleted deployment ID: {deployment_id}, app: {app_name}, status: deleted "
+            f"(removed {deleted} K8s resource(s))"
         )
 
     if intent == "sre":
@@ -190,6 +263,37 @@ def get_session(
         created_at=session.created_at,
         updated_at=session.updated_at,
         messages=[MessageOut.model_validate(m) for m in messages],
+    )
+
+
+@router.get(
+    "/sessions/{session_id}/deployments",
+    response_model=list[DeploymentSummary],
+)
+def list_session_deployments(
+    session_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[Deployment]:
+    """Authoritative list of deployments created in this chat session.
+
+    The frontend uses this to populate the Visualization tab's deployment
+    dropdown so it survives logout/login (chat-bubble regex scraping was
+    unreliable). Standalone deploys (chat_session_id IS NULL) are intentionally
+    excluded — they're not session-scoped.
+    """
+    session = db.get(ChatSession, session_id)
+    if session is None or session.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_SESSION_NOT_FOUND)
+
+    return (
+        db.query(Deployment)
+        .filter(
+            Deployment.user_id == user.id,
+            Deployment.chat_session_id == session_id,
+        )
+        .order_by(Deployment.created_at.desc())
+        .all()
     )
 
 
