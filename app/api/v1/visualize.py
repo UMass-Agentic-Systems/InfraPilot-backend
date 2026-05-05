@@ -119,6 +119,7 @@ def visualize(
             analysis=p.analysis,
             approved=p.approved,
             applied=p.applied,
+            rejected=p.rejected,
             source=p.source,
             created_at=p.created_at,
         )

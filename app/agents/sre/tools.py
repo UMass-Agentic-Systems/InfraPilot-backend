@@ -20,7 +20,7 @@ from app.services.k8s_client import KubernetesService
 
 logger = logging.getLogger(__name__)
 
-_GEMINI_MODEL = "gemini-2.5-flash"
+_GEMINI_MODEL = "gemini-2.5-pro"
 _TEMPERATURE = 0.1
 
 _SYSTEM_PROMPT = """You are a Kubernetes Site Reliability Engineer.

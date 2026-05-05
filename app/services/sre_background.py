@@ -161,7 +161,12 @@ async def _maybe_alert_user(
     if not await ws_manager.is_user_connected(user.id):
         return
 
-    session_id = await ws_manager.get_active_session(user.id)
+    # Persist the alert in the deployment's own session so the visualization
+    # tab for that session can show the plan. Fall back to the active session
+    # for standalone deployments that have no chat_session_id.
+    own_session_id = deployment.chat_session_id
+    active_session_id = await ws_manager.get_active_session(user.id)
+    session_id = own_session_id if own_session_id is not None else active_session_id
     if session_id is None:
         return
 
@@ -174,6 +179,7 @@ async def _maybe_alert_user(
     metadata = json.dumps(
         {
             "deployment_id": deployment.id,
+            "app_name": deployment.app_name,
             "plan_id": plan_id,
             "source": "background",
             "status": "awaiting_approval",
@@ -197,6 +203,7 @@ async def _maybe_alert_user(
         user.id,
         {
             "type": "sre_alert",
+            "session_id": session_id,
             "deployment_id": deployment.id,
             "app_name": deployment.app_name,
             "message": {
@@ -218,6 +225,7 @@ def _latest_unresolved_plan(db: Session, deployment_id: int) -> RemediationPlan 
             RemediationPlan.deployment_id == deployment_id,
             RemediationPlan.approved.is_(False),
             RemediationPlan.applied.is_(False),
+            RemediationPlan.rejected.is_(False),
         )
         .order_by(RemediationPlan.created_at.desc())
         .first()
@@ -256,7 +264,7 @@ def is_recent_unresolved_plan(
     """Time-based dedup: True iff `plan` is unresolved and within 2×interval."""
     if plan is None:
         return False
-    if plan.approved or plan.applied:
+    if plan.approved or plan.applied or plan.rejected:
         return False
     plan_time = plan.created_at
     if plan_time is None:

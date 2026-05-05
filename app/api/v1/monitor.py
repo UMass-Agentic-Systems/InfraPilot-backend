@@ -6,6 +6,7 @@ via deployment-scoped thread IDs, so plans created here can be approved via
 chat and vice versa (spec §6.4).
 """
 
+import json
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -20,10 +21,35 @@ from app.api.schemas.monitor import (
     ScanRequest,
     ScanResponse,
 )
-from app.db.models import Deployment, RemediationPlan, User
+from app.core.ws_manager import manager
+from app.db.models import ChatMessage, Deployment, RemediationPlan, User
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def _update_plan_messages(db: Session, plan_id: int, approved: bool, applied: bool) -> None:
+    """Update metadata_json on ChatMessages that reference plan_id so reloaded history reflects the decision."""
+    msgs = (
+        db.query(ChatMessage)
+        .filter(ChatMessage.metadata_json.contains(f'"plan_id": {plan_id}'))
+        .all()
+    )
+    updated = False
+    for msg in msgs:
+        try:
+            meta = json.loads(msg.metadata_json)
+        except (TypeError, ValueError):
+            continue
+        if meta.get("plan_id") != plan_id:
+            continue
+        meta["approved"] = approved
+        meta["applied"] = applied
+        meta["status"] = "approved" if approved else "rejected"
+        msg.metadata_json = json.dumps(meta)
+        updated = True
+    if updated:
+        db.commit()
 
 
 @router.post("/scan", response_model=ScanResponse)
@@ -92,4 +118,17 @@ async def approve_plan(
         approved=payload.approved,
         db=db,
     )
+
+    _update_plan_messages(db, plan_id, result["approved"], result["applied"])
+
+    await manager.send_to_user(
+        user.id,
+        {
+            "type": "plan_update",
+            "plan_id": plan_id,
+            "approved": result["approved"],
+            "applied": result["applied"],
+        },
+    )
+
     return ApproveResponse(**result)

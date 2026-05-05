@@ -80,6 +80,7 @@ class RemediationPlanRef(BaseModel):
     analysis: str
     approved: bool
     applied: bool
+    rejected: bool
     source: str
     created_at: datetime
 
