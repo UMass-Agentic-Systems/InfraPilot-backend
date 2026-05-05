@@ -64,7 +64,9 @@ def _detect_intent(content: str) -> str:
     return "general"
 
 
-def _delete_deployment(deployment: Deployment, namespace: str, db: Session) -> tuple[int, list[str]]:
+def _delete_deployment(
+    deployment: Deployment, namespace: str, db: Session
+) -> tuple[int, list[str]]:
     """Tear down the deployment's K8s resources and drop the DB row.
 
     Returns (deleted_count, errors). RemediationPlan rows CASCADE on delete.
