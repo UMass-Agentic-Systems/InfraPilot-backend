@@ -38,7 +38,7 @@ def _update_plan_messages(db: Session, plan_id: int, approved: bool, applied: bo
     updated = False
     for msg in msgs:
         try:
-            meta = json.loads(msg.metadata_json)
+            meta = json.loads(msg.metadata_json or "")
         except (TypeError, ValueError):
             continue
         if meta.get("plan_id") != plan_id:
