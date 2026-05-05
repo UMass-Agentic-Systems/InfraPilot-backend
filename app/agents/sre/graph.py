@@ -105,6 +105,7 @@ def _build_graph(db: Session) -> Any:
             row = db.get(RemediationPlan, plan_id)
             if row is not None:
                 row.approved = approved
+                row.rejected = not approved
                 db.commit()
         return {"approved": approved}
 

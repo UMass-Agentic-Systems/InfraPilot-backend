@@ -147,6 +147,7 @@ def test_plan_summary_from_attributes_supported() -> None:
         rationale="r",
         approved=False,
         applied=False,
+        rejected=False,
         source="manual",
         created_at=datetime.now(timezone.utc),
     )

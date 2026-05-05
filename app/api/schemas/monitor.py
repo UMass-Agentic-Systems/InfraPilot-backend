@@ -23,6 +23,7 @@ class PlanSummary(BaseModel):
     rationale: str
     approved: bool
     applied: bool
+    rejected: bool
     source: str  # "manual" | "background"
     created_at: datetime
 

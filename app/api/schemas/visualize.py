@@ -64,12 +64,15 @@ class TierInfo(BaseModel):
 
 
 class TrafficMetrics(BaseModel):
-    requests_per_second: float
-    avg_latency_ms: float
-    p95_latency_ms: float
-    p99_latency_ms: float
-    error_rate_percent: float
-    uptime_percent: float
+    # All fields are optional so partial telemetry sources (e.g. pod readiness
+    # → uptime only) can populate just what they have. Frontend hides any
+    # field that comes back null. Spec FR-14.2.
+    requests_per_second: float | None = None
+    avg_latency_ms: float | None = None
+    p95_latency_ms: float | None = None
+    p99_latency_ms: float | None = None
+    error_rate_percent: float | None = None
+    uptime_percent: float | None = None
 
 
 class RemediationPlanRef(BaseModel):
@@ -77,6 +80,7 @@ class RemediationPlanRef(BaseModel):
     analysis: str
     approved: bool
     applied: bool
+    rejected: bool
     source: str
     created_at: datetime
 

@@ -139,7 +139,7 @@ def test_visualize_returns_cluster_and_tiers(
     assert body["error"] is None
 
 
-def test_visualize_traffic_always_null(
+def test_visualize_traffic_derived_from_pods(
     client: TestClient,
     auth_headers: dict[str, str],
     db_session: Session,
@@ -152,7 +152,10 @@ def test_visualize_traffic_always_null(
     resp = client.get(f"/api/v1/visualize/{deployment.id}", headers=auth_headers)
 
     assert resp.status_code == 200
-    assert resp.json()["traffic"] is None
+    traffic = resp.json()["traffic"]
+    # uptime_percent is derived from pod readiness (1/1 running → 100.0)
+    assert traffic is not None
+    assert traffic["uptime_percent"] == 100.0
 
 
 # ---------------------------------------------------------------------------

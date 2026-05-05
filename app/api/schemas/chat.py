@@ -40,6 +40,20 @@ class SessionDetail(SessionSummary):
     messages: list[MessageOut] = Field(default_factory=list)
 
 
+class DeploymentSummary(BaseModel):
+    """Per-session deployment listing — source of truth for the frontend's
+    Visualization dropdown (replaces fragile chat-bubble regex scraping).
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    app_name: str
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+
 # ---------------------------------------------------------------------------
 # WebSocket frame models (spec §6.4)
 # ---------------------------------------------------------------------------
