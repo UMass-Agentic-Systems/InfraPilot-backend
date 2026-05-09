@@ -36,157 +36,25 @@ Multi-tenant namespace isolation ensures that each user's resources are securely
 - **WebSocket Chat Interface** — Primary interaction surface for all deployment and SRE operations; persistent chat sessions with full history backed by PostgreSQL.
 - **Infrastructure Visualization** — Live cluster state per deployment: pod counts, resource requests, services, HPAs, PVCs, and remediation history.
 
-## API Endpoints
+## Documentation
 
-### Health
+| Document | Audience | What's inside |
+|---|---|---|
+| [BUILD.md](BUILD.md) | Operators | Prerequisites, installation, configuration, local dev, and production deployment guidance |
+| [docs/API.md](docs/API.md) | API consumers, Project Document | Full HTTP + WebSocket reference with request/response schemas |
+| [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) | Reviewers | Non-functional requirements and challenges & risks |
+| [docs/use_case_verification.md](docs/use_case_verification.md) | Reviewers | Use-case-by-use-case verification matrix |
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/health` | Liveness check — returns `{"status": "ok"}` |
-
-### Authentication
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/v1/auth/register` | Register a new user and provision a K8s namespace |
-| POST | `/api/v1/auth/login` | Authenticate and receive a JWT access token |
-
-### Deployments
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/v1/deploy/` | Deploy an application via natural-language requirements |
-| GET | `/api/v1/deploy/{deployment_id}` | View deployment status and desired-state YAML |
-
-### Monitoring & Remediation
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/v1/monitor/scan` | Trigger an SRE health scan for a deployment |
-| GET | `/api/v1/monitor/plans` | List all remediation plans for the authenticated user |
-| POST | `/api/v1/monitor/plans/{plan_id}/approve` | Approve or reject a pending remediation plan |
-
-### Chat
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/v1/chat/sessions` | Create a new chat session |
-| GET | `/api/v1/chat/sessions` | List all chat sessions for the authenticated user |
-| GET | `/api/v1/chat/sessions/{session_id}` | Get a session with full message history |
-| WS | `/api/v1/chat/sessions/{session_id}/ws?token={jwt}` | WebSocket — primary interface for deploy and SRE operations |
-| DELETE | `/api/v1/chat/sessions/{session_id}` | Delete a session and all its messages |
-
-### Visualization
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/v1/visualize/{deployment_id}` | Live cluster state: pods, services, HPAs, PVCs, and remediation history |
-
-## Non-Functional Requirements
-
-- **Data Security** — Passwords hashed with bcrypt; JWT-based authentication with configurable expiration; secrets excluded from logs and responses.
-- **Tenant Isolation** — Unique Kubernetes namespace per user; strict ownership checks on all API endpoints.
-- **Auditability** — Every remediation plan persists a rationale, approval decision, and execution status with timestamps.
-- **Availability** — The `/health` endpoint returns `200 OK` even when the database or K8s cluster is temporarily unreachable.
-
-## Challenges & Risks
-
-### 1. LLM Output Reliability
-The Provisioning Agent depends on Gemini-Pro to generate valid Kubernetes YAML from natural language. LLMs may produce malformed manifests or insecure defaults.
-
-**Mitigations:** YAML validation with `yaml.safe_load()`, low LLM temperature, structured prompts with explicit output format instructions.
-
-### 2. Kubernetes Integration Complexity
-Differences between Minikube, managed clusters (GKE/EKS), and bare-metal setups introduce inconsistencies in API behavior and RBAC policies.
-
-**Mitigations:** Minikube as the development baseline with a documented setup guide; structured error handling around all K8s API calls.
-
-### 3. Project Timeline & Dependency Drift
-The project depends on rapidly evolving libraries (LangGraph, LangChain, Kubernetes Python client) and must ship within an academic semester.
-
-**Mitigations:** Pinned dependency versions in `pyproject.toml`; prioritized core workflow (register → deploy → scan → approve); sprint-based schedule with bi-weekly milestones.
-
-## Quickstart
-
-### Prerequisites
-
-- Python 3.11+
-- [Docker](https://docs.docker.com/get-docker/) (for running PostgreSQL)
-- [Minikube](https://minikube.sigs.k8s.io/docs/start/) (for local Kubernetes features)
-- A [Google Gemini API key](https://aistudio.google.com/app/apikey) — **required**
-
-### 1. Clone and enter the repo
-
-```bash
-git clone https://github.com/UMass-Agentic-Systems/InfraPilot-backend.git
-cd InfraPilot-backend
-```
-
-### 2. Create and activate a virtual environment
-
-```bash
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-```
-
-### 3. Install dependencies
+## Quick start
 
 ```bash
 pip install -e ".[dev]"
-```
-
-### 4. Start PostgreSQL and create the database
-
-Make sure Docker Desktop is running, then:
-
-```bash
-docker run -d --name infrapilot-db -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres:16
-docker exec -i infrapilot-db psql -U postgres -c "CREATE DATABASE infrapilot;"
-```
-
-### 5. Configure environment variables
-
-```bash
-cp .env.example .env
-```
-
-Open `.env` and set these values:
-
-| Variable | Required | Notes |
-|----------|----------|-------|
-| `SECRET_KEY` | **Yes** | Generate with `python -c "import secrets; print(secrets.token_hex(32))"` |
-| `GOOGLE_API_KEY` | **Yes** | From [Google AI Studio](https://aistudio.google.com/app/apikey) |
-| `DATABASE_URL` | No | Defaults to `postgresql://postgres:postgres@localhost:5432/infrapilot` — matches the Docker command above |
-| `ALGORITHM` | No | Defaults to `HS256` |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | No | Defaults to `60` |
-| `KUBECONFIG_PATH` | No | Defaults to `~/.kube/config` |
-| `SRE_SCAN_INTERVAL_SECONDS` | No | Defaults to `120` |
-
-### 6. Start Minikube (optional — required for K8s features)
-
-```bash
-minikube start
-```
-
-### 7. Start the development server
-
-> **Note:** Database tables are created automatically on server startup (`create_all`). No migration step is needed in development.
-
-```bash
+cp .env.example .env   # set SECRET_KEY and GOOGLE_API_KEY
 uvicorn app.main:app --reload
 ```
 
-The API will be available at `http://localhost:8000`. Interactive docs at `http://localhost:8000/docs`.
+See [BUILD.md](BUILD.md) for the full setup (PostgreSQL, Minikube, environment variables, and production deployment).
 
-Verify the server is running:
+## License
 
-```bash
-curl http://localhost:8000/health
-# {"status":"ok"}
-```
-
-### 8. Run tests
-
-```bash
-pytest
-```
+See [LICENSE](LICENSE).
