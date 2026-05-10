@@ -1,6 +1,7 @@
 """Visualization endpoint — live cluster state (spec §6.5, issue #18)."""
 
 import logging
+from datetime import datetime, timezone
 from typing import Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -107,51 +108,71 @@ def visualize(
         # the deployment exists under a different session.
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Deployment not found")
 
-    plans = (
-        db.query(RemediationPlan)
-        .filter(RemediationPlan.deployment_id == deployment_id)
-        .order_by(RemediationPlan.created_at)
-        .all()
-    )
-    plan_refs = [
-        RemediationPlanRef(
-            id=p.id,
-            analysis=p.analysis,
-            approved=p.approved,
-            applied=p.applied,
-            rejected=p.rejected,
-            source=p.source,
-            created_at=p.created_at,
-        )
-        for p in plans
-    ]
-
-    base: dict[str, Any] = dict(
-        deployment_id=deployment.id,
-        app_name=deployment.app_name,
-        status=deployment.status,
-        namespace=user.namespace,
-        created_at=deployment.created_at,
-        updated_at=deployment.updated_at,
-        remediation_plans=plan_refs,
-    )
-
     try:
-        k8s = KubernetesService.get_instance()
-        ns_status = k8s.get_namespace_status(user.namespace)
-        tiers = [_build_tier(cast(dict[str, Any], t)) for t in ns_status.get("tiers", [])]
-        return VisualizeResponse(
-            cluster=_build_cluster(ns_status["cluster"]),
-            tiers=tiers,
-            traffic=_build_traffic(tiers),
-            **base,
+        plans = (
+            db.query(RemediationPlan)
+            .filter(RemediationPlan.deployment_id == deployment_id)
+            .order_by(RemediationPlan.created_at)
+            .all()
         )
+        plan_refs = [
+            RemediationPlanRef(
+                id=p.id,
+                analysis=p.analysis,
+                approved=p.approved,
+                applied=p.applied,
+                rejected=p.rejected,
+                source=p.source,
+                created_at=p.created_at,
+            )
+            for p in plans
+        ]
+
+        base: dict[str, Any] = dict(
+            deployment_id=deployment.id,
+            app_name=deployment.app_name,
+            status=deployment.status,
+            namespace=user.namespace,
+            created_at=deployment.created_at,
+            updated_at=deployment.updated_at,
+            remediation_plans=plan_refs,
+        )
+
+        try:
+            k8s = KubernetesService.get_instance()
+            ns_status = k8s.get_namespace_status(user.namespace)
+            tiers = [_build_tier(cast(dict[str, Any], t)) for t in ns_status.get("tiers", [])]
+            return VisualizeResponse(
+                cluster=_build_cluster(ns_status["cluster"]),
+                tiers=tiers,
+                traffic=_build_traffic(tiers),
+                **base,
+            )
+        except Exception as exc:
+            logger.warning("K8s unavailable for visualize(%s): %s", deployment_id, exc)
+            return VisualizeResponse(
+                cluster=None,
+                tiers=[],
+                traffic=None,
+                error=f"Kubernetes unavailable: {exc}",
+                **base,
+            )
     except Exception as exc:
-        logger.warning("K8s unavailable for visualize(%s): %s", deployment_id, exc)
+        # Any other failure (bad DB row, Pydantic validation, etc.) — degrade to a
+        # minimal valid response so the frontend can render a real error message
+        # instead of getting a CORS-stripped 500.
+        logger.exception("visualize(%s) failed", deployment_id)
+        now = datetime.now(timezone.utc)
         return VisualizeResponse(
+            deployment_id=deployment.id,
+            app_name=deployment.app_name or f"deployment-{deployment.id}",
+            status=deployment.status or "unknown",
+            namespace=user.namespace or "",
+            created_at=deployment.created_at or now,
+            updated_at=deployment.updated_at or now,
             cluster=None,
             tiers=[],
             traffic=None,
-            error=f"Kubernetes unavailable: {exc}",
-            **base,
+            remediation_plans=[],
+            error=f"Visualization unavailable: {exc}",
         )
