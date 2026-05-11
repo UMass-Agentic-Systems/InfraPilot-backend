@@ -58,6 +58,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     # Ensures 500 responses flow through CORSMiddleware so the browser doesn't
