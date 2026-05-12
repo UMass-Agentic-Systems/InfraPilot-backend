@@ -2,6 +2,11 @@
 
 This document specifies the HTTP and WebSocket surface exposed by the InfraPilot backend (FastAPI). Endpoint contracts are derived from the Pydantic models in [app/api/schemas/](../app/api/schemas/) and the route handlers in [app/api/v1/](../app/api/v1/).
 
+- API documentation is available as swagger docs on backeknd endpoint `/docs`. Attached a screenshot of the same.
+<img width="2936" height="1660" alt="image" src="https://github.com/user-attachments/assets/711c8b44-e8ee-4b04-985e-3e67063d0f88" />
+
+
+
 ---
 
 ## Conventions
